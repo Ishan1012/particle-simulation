@@ -1,13 +1,14 @@
 import streamlit as st
 import cv2
 import numpy as np
-from streamlit_webrtc import webrtc_streamer, VideoTransformerBase, WebRtcMode
+import av
+from streamlit_webrtc import webrtc_streamer, VideoProcessorBase, WebRtcMode
 from hand_tracker import HandTracker
 from particle import ParticleManager
 
 st.set_page_config(page_title="Hand Particle Sim", layout="wide")
 
-class ParticleProcessor(VideoTransformerBase):
+class ParticleProcessor(VideoProcessorBase):
     def __init__(self, spawn_rate, bg_gray):
         self.hand_tracker = HandTracker()
         self.particle_manager = ParticleManager()
@@ -15,7 +16,7 @@ class ParticleProcessor(VideoTransformerBase):
         self.bg_gray = bg_gray
         self.zoom_factor = 1.5
 
-    def transform(self, frame):
+    def recv(self, frame):
         img = frame.to_ndarray(format="bgr24")
         h, w = img.shape[:2]
         canvas_h, canvas_w = int(h * self.zoom_factor), int(w * self.zoom_factor)
@@ -39,9 +40,10 @@ class ParticleProcessor(VideoTransformerBase):
         ph, pw = h // 4, w // 4
         pip = cv2.resize(frame_proc, (pw, ph))
         cv2.rectangle(pip, (0, 0), (pw - 1, ph - 1), (255, 255, 255), 2)
+        
         canvas[canvas_h - ph - 20 : canvas_h - 20, canvas_w - pw - 20 : canvas_w - 20] = pip
 
-        return canvas
+        return av.VideoFrame.from_ndarray(canvas, format="bgr24")
 
 def main():
     if 'run' not in st.session_state:
@@ -65,15 +67,10 @@ def main():
                 "video": True,
                 "audio": False
             },
-            video_html_attrs={
-                "style": {"width": "100%"},
-                "controls": False,
-                "autoPlay": True,
-            },
-            desired_playing_state=True,
+            async_processing=True,
         )
     else:
-        st.info("Simulation is currently stopped. Use the sidebar button to start.")
+        st.info("Simulation is currently stopped.")
 
 if __name__ == "__main__":
     main()
